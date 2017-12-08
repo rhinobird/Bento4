@@ -308,17 +308,16 @@ def ParseMpd(url, xml):
         
     return mpd
         
-def MakeNewDir(dir, is_warning=False):
+def MakeNewDir(dir, force=False):
     if os.path.exists(dir):
-        if is_warning:
-            print 'WARNING: ',
+        if force:
+            print 'directory "'+dir+'" already exists, deleting with all it\'s content'
+            shutil.rmtree(dir)
         else:
-            print 'ERROR: ',
-        print 'directory "'+dir+'" already exists'
-        if not is_warning:
+            print 'directory "'+dir+'" already exists'
             sys.exit(1)
-    else:
-        os.mkdir(dir)
+
+    os.mkdir(dir)
 
 def OpenURL(url):
     if url.startswith("file://"):
@@ -447,7 +446,7 @@ def main():
     output_dir = options.output_dir
 
     # create the output dir
-    MakeNewDir(options.output_dir, True)
+    MakeNewDir(options.output_dir, options.force_output)
     
     # load and parse the MPD
     if options.verbose: print "Loading MPD from", mpd_url
