@@ -347,7 +347,8 @@ def GenerateHls(list, options):
     tmp_media_sources = []
     for url in media_sources:
         tmp_media_file = SaveMp4Header(options.output_dir, str(url))
-        tmp_media_sources.append(MediaSource(tmp_media_file))
+        if not tmp_media_file is None:
+            tmp_media_sources.append(MediaSource(tmp_media_file))
     
     # parse the attributes definitions
     set_attributes = {}
@@ -1044,10 +1045,10 @@ def OutputHippo(options, audio_tracks, video_tracks):
 def SaveMp4Header(output_dir, remote_url):
     # load and parse the Mp4 file
     print "Loading Mp4 from", remote_url
+    sys_random = random.SystemRandom()
+    random_iv = str(sys_random.getrandbits(16))
+    tmp_mp4 = path.join(output_dir, 'tmp' + random_iv + '.mp4')
     try:
-        sys_random = random.SystemRandom()
-        random_iv = str(sys_random.getrandbits(16))
-        tmp_mp4 = path.join(output_dir, 'tmp' + random_iv + '.mp4')
         sidx_downloaded = False
         with open(tmp_mp4, 'wb') as f:
             reader = urllib2.urlopen(remote_url)
@@ -1063,7 +1064,8 @@ def SaveMp4Header(output_dir, remote_url):
             f.close()
     except Exception as e:
         print "ERROR: failed to load Mp4:", e
-        sys.exit(1)
+        os.remove(tmp_mp4)
+        return None
     return tmp_mp4
 
 #############################################
@@ -1525,7 +1527,8 @@ def main():
         tmp_media_sources = []
         for url in media_sources:
             tmp_media_file = SaveMp4Header(options.output_dir, str(url))
-            tmp_media_sources.append(MediaSource(tmp_media_file))
+            if not tmp_media_file is None:
+                tmp_media_sources.append(MediaSource(tmp_media_file))
 
     # for on-demand, we need to first extract tracks into individual media files
     if options.on_demand:
