@@ -86,20 +86,21 @@ def ProcessUrlTemplate(template, representation_id, bandwidth, time, number):
     result = result.replace('$$', '$')
     return result
 
-def GetMpdUrls(xml):
+def GetMpdSources(xml):
     mpd_tree = ElementTree.fromstring(xml)
-    return GetMpdUrlFromChild(mpd_tree)
+    return GetMpdSourceFromChild(mpd_tree)
 
-def GetMpdUrlFromChild(child):
-    urls = []
+def GetMpdSourceFromChild(child):
+    mpd_sources = []
     
     for c in child:
         if 'BaseURL' in c.tag:
-            urls.append(c.text)
+            mpd_source = MpdSource(c.text, None)
+            mpd_sources.append(mpd_source)
         else:
-            urls += GetMpdUrlFromChild(c)
+            mpd_sources += GetMpdSourceFromChild(c)
 
-    return urls
+    return mpd_sources
     
 class DashSegmentBaseInfo:
     def __init__(self, xml):
@@ -396,7 +397,12 @@ class Cloner:
     def Cleanup(self):
         if (self.init_filename):
             os.unlink(self.init_filename)
-        
+
+class MpdSource:
+    def __init__(self, url, segment_info):
+        self.url = url
+        self.segment_info = segment_info
+
 def main():
     # determine the platform binary name
     host_platform = ''
@@ -457,10 +463,10 @@ def main():
         sys.exit(1)
         
     if Options.verbose: print "Parsing MPD"
-    urls = GetMpdUrls(mpd_xml)
+    mpd_sources = GetMpdSources(mpd_xml)
 
     # Add the directory containing your module to the Python path (wants absolute paths)
-    mp4tohls.GenerateHls(urls, options)
+    mp4tohls.GenerateHls(mpd_sources, options)
 
     
 ###########################    

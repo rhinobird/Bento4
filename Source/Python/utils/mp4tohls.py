@@ -342,11 +342,11 @@ def AddDescriptor(adaptation_set, set_attributes, set_name, category_name):
 
 #############################################
 def GenerateHls(list, options):
-    media_sources = [MediaSource(source) for source in list]
+    media_sources = [MediaSource(mpd_source.url) for mpd_source in list]
     
     tmp_media_sources = []
-    for url in media_sources:
-        tmp_media_file = SaveMp4Header(options.output_dir, str(url))
+    for media_source in media_sources:
+        tmp_media_file = SaveMp4Header(options.output_dir, str(media_source))
         if not tmp_media_file is None:
             tmp_media_sources.append(MediaSource(tmp_media_file))
     
@@ -1044,7 +1044,7 @@ def OutputHippo(options, audio_tracks, video_tracks):
 #############################################
 def SaveMp4Header(output_dir, remote_url):
     # load and parse the Mp4 file
-    print "Loading Mp4 from", remote_url
+    print "Loading Mp4 from:", remote_url
     sys_random = random.SystemRandom()
     random_iv = str(sys_random.getrandbits(16))
     tmp_mp4 = path.join(output_dir, 'tmp' + random_iv + '.mp4')
@@ -1064,6 +1064,37 @@ def SaveMp4Header(output_dir, remote_url):
             f.close()
     except Exception as e:
         print "ERROR: failed to load Mp4:", e
+        os.remove(tmp_mp4)
+        tmp_mp4 = SaveMp4HeaderWithSq(output_dir, remote_url)
+
+    print 'Saving:' + tmp_mp4 + '\n\n'
+    return tmp_mp4
+
+#############################################
+def SaveMp4HeaderWithSq(output_dir, remote_url):
+    # load and parse the Mp4 file
+    sys_random = random.SystemRandom()
+    random_iv = str(sys_random.getrandbits(16))
+    tmp_mp4 = path.join(output_dir, 'tmp' + random_iv + '.mp4')
+    sq = 0
+    try:
+        sidx_downloaded = False
+        with open(tmp_mp4, 'wb') as f:
+            while not sidx_downloaded:
+                sq_url = remote_url + 'sq/' + str(sq)
+                print "Loading Mp4 from (using seq):", sq_url
+                reader = urllib2.urlopen(sq_url)
+                chunk = reader.read()
+                f.write(chunk)
+                atoms = WalkAtoms(tmp_mp4)
+                for atom in atoms:
+                    if atom.type == 'moof':
+                        sidx_downloaded=True
+                        break
+                sq += 1
+            f.close()
+    except Exception as e:
+        print "ERROR: failed to load Mp4 (using seq):", e
         os.remove(tmp_mp4)
         return None
     return tmp_mp4
