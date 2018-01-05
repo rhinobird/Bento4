@@ -25,6 +25,7 @@ import json
 import sys
 import mp4tohls
 import platform
+import math
 from xml.etree import ElementTree
 from subprocess import check_output, CalledProcessError
 
@@ -398,10 +399,41 @@ class Cloner:
         if (self.init_filename):
             os.unlink(self.init_filename)
 
+class MpdSegment:
+    def __init__(self, representation, segment_info, position = None):
+        self.type = segment_info.tag
+        
+        segment_timeline_list = representation.parent.xml.find(DASH_NS+'SegmentList')
+        timescale = segment_timeline_list.get('timescale')
+        
+        if self.type == DASH_NS+'SegmentURL' and position is not None:
+            timeline_duration = segment_timeline_list.find(DASH_NS+'SegmentTimeline')[position].get('d')
+            self.duration = float(timeline_duration) / float(timescale)
+            self.url = segment_info.get('media')
+        elif self.type == DASH_NS+'Initialization':
+            self.duration = 0
+            self.url = segment_info.get('sourceURL')
+
 class MpdSource:
-    def __init__(self, url, segment_info):
-        self.url = url
-        self.segment_info = segment_info
+    def __init__(self, representation):
+        self.id = representation.xml.get('id')
+        self.base_url = representation.xml.find(DASH_NS+'BaseURL').text
+        self.type = representation.parent.xml.get('mimeType')
+        self.bandwidth = representation.xml.get('bandwidth')
+        self.codecs = representation.xml.get('codecs')
+        
+        self.framerate = representation.xml.get('frameRate') or 0
+        self.width = representation.xml.get('width') or None
+        self.height = representation.xml.get('height') or None
+        self.data_segments = []
+        position = 0
+        for segment in representation.xml.find(DASH_NS+'SegmentList'):
+            if segment.tag == DASH_NS+'Initialization':
+                self.init_segment = MpdSegment(representation, segment)
+            elif segment.tag == DASH_NS+'SegmentURL':
+                mpd_segment = MpdSegment(representation, segment, position)
+                self.data_segments.append(mpd_segment)
+                position += 1
 
 def main():
     # determine the platform binary name
@@ -455,18 +487,104 @@ def main():
     MakeNewDir(options.output_dir, options.force_output)
     
     # load and parse the MPD
-    if options.verbose: print "Loading MPD from", mpd_url
+    if Options.verbose: print "Loading MPD from", mpd_url
     try:
         mpd_xml = OpenURL(mpd_url).read()
     except Exception as e:
         print "ERROR: failed to load MPD:", e
         sys.exit(1)
-        
-    if Options.verbose: print "Parsing MPD"
-    mpd_sources = GetMpdSources(mpd_xml)
 
-    # Add the directory containing your module to the Python path (wants absolute paths)
-    mp4tohls.GenerateHls(mpd_sources, options)
+    if Options.verbose: print "Parsing MPD"
+    mpd_xml = mpd_xml.replace('nitialisation', 'nitialization')
+    mpd = ParseMpd(mpd_url, mpd_xml)
+
+    ElementTree.register_namespace('', DASH_NS_URN)
+    ElementTree.register_namespace('mas', MARLIN_MAS_NS_URN)
+
+    audio_sources = []
+    video_sources = []
+    
+    for period in mpd.periods:
+        for adaptation_set in period.adaptation_sets:
+            for representation in adaptation_set.representations:
+                mpd_source = MpdSource(representation)
+                if mpd_source.type == 'audio/mp4':
+                    audio_sources.append(mpd_source)
+                elif mpd_source.type == 'video/mp4':
+                    video_sources.append(mpd_source)
+
+    master_playlist_file = open(path.join(options.output_dir, options.hls_master_playlist_name), 'w+')
+    master_playlist_file.write('#EXTM3U\r\n')
+    master_playlist_file.write('# Created with Bento4 mp4-dash.py, VERSION=' + mp4tohls.VERSION + '-' + mp4tohls.SDK_REVISION+'\r\n')
+    master_playlist_file.write('#\r\n')
+    master_playlist_file.write('#EXT-X-VERSION:6\r\n')
+    master_playlist_file.write('#EXT-X-INDEPENDENT-SEGMENTS\r\n')
+    
+    master_playlist_file.write('\r\n')
+    master_playlist_file.write('# Media Playlists\r\n')
+    
+    master_playlist_file.write('\r\n')
+    master_playlist_file.write('# Audio\r\n')
+
+    for i, audio_source in enumerate(audio_sources):
+        filename = audio_source.id + '.m3u8'
+        media_playlist_file = open(path.join(options.output_dir, filename), 'w+')
+        master_playlist_file.write(('#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud%d",LANGUAGE="en",NAME="English",BANDWIDTH=%d,AUTOSELECT=YES,DEFAULT=YES,URI="%s"\r\n' % (
+                                   i,
+                                   int(audio_source.bandwidth),
+                                   filename)).encode('utf-8'))
+
+        max_duration = int(math.ceil(max([value.duration for index, value in enumerate(audio_source.data_segments)])))
+
+        media_playlist_file.write('#EXTM3U\r\n')
+        media_playlist_file.write('# Created with Bento4 mp4-dash.py, VERSION=' + mp4tohls.VERSION + '-' + mp4tohls.SDK_REVISION+'\r\n')
+        media_playlist_file.write('#\r\n')
+        media_playlist_file.write('#EXT-X-VERSION:6\r\n')
+        media_playlist_file.write('#EXT-X-PLAYLIST-TYPE:VOD\r\n')
+        media_playlist_file.write('#EXT-X-INDEPENDENT-SEGMENTS\r\n')
+        media_playlist_file.write('#EXT-X-TARGETDURATION:%d\r\n' % (max_duration))
+#        media_playlist_file.write('#EXT-X-MEDIA-SEQUENCE:0\r\n')
+#        init_segment_size = track.parent.init_segment.position + track.parent.init_segment.size
+#        media_playlist_file.write('#EXT-X-MAP:URI="%s",BYTERANGE="%d@0"\r\n' % (media_file_name, init_segment_size))
+        bitrate = int(audio_source.bandwidth) / len(audio_source.data_segments)
+        for data in audio_source.data_segments:
+            media_playlist_file.write('#EXTINF:%f,\r\n' % (data.duration))
+            media_playlist_file.write('#EXT-X-BITRATE:%d\r\n' % (bitrate))
+            media_playlist_file.write((path.join(audio_source.base_url, data.url)).encode('utf-8'))
+            media_playlist_file.write('\r\n')
+
+    master_playlist_file.write('\r\n')
+    master_playlist_file.write('# Video\r\n')
+
+    for j, video_source in enumerate(video_sources):
+        filename = video_source.id + '.m3u8'
+        media_playlist_file = open(path.join(options.output_dir, filename), 'w+')
+        for i, audio_source in enumerate(audio_sources):
+            master_playlist_file.write(('#EXT-X-STREAM-INF:AUDIO="aud%d",AVERAGE-BANDWIDTH=%d,BANDWIDTH=%d,CODECS="%s",RESOLUTION=%sx%s\r\n' % (
+                                        i,
+                                        int(video_source.bandwidth) + int(audio_source.bandwidth),
+                                        int(video_source.bandwidth) + int(audio_source.bandwidth),
+                                        video_source.codecs + ',' + audio_source.codecs,
+                                        video_source.width,
+                                        video_source.height)).encode('utf-8'))
+            master_playlist_file.write(filename+'\r\n')
+        
+        max_duration = int(math.ceil(max([value.duration for index, value in enumerate(video_source.data_segments)])))
+
+        media_playlist_file.write('#EXTM3U\r\n')
+        media_playlist_file.write('# Created with Bento4 mp4-dash.py, VERSION=' + mp4tohls.VERSION + '-' + mp4tohls.SDK_REVISION+'\r\n')
+        media_playlist_file.write('#\r\n')
+        media_playlist_file.write('#EXT-X-VERSION:6\r\n')
+        media_playlist_file.write('#EXT-X-PLAYLIST-TYPE:VOD\r\n')
+        media_playlist_file.write('#EXT-X-INDEPENDENT-SEGMENTS\r\n')
+        media_playlist_file.write('#EXT-X-TARGETDURATION:%d\r\n' % (max_duration))
+
+        bitrate = int(video_source.bandwidth) / len(video_source.data_segments)
+        for data in video_source.data_segments:
+            media_playlist_file.write('#EXTINF:%f,\r\n' % (data.duration))
+            media_playlist_file.write('#EXT-X-BITRATE:%d\r\n' % (bitrate))
+            media_playlist_file.write((path.join(video_source.base_url, data.url)).encode('utf-8'))
+            media_playlist_file.write('\r\n')
 
     
 ###########################    
