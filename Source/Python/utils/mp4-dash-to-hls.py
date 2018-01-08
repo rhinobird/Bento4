@@ -537,21 +537,19 @@ def main():
         max_duration = int(math.ceil(max([value.duration for index, value in enumerate(audio_source.data_segments)])))
 
         media_playlist_file.write('#EXTM3U\r\n')
-        media_playlist_file.write('# Created with Bento4 mp4-dash.py, VERSION=' + mp4tohls.VERSION + '-' + mp4tohls.SDK_REVISION+'\r\n')
-        media_playlist_file.write('#\r\n')
-        media_playlist_file.write('#EXT-X-VERSION:6\r\n')
-        media_playlist_file.write('#EXT-X-PLAYLIST-TYPE:VOD\r\n')
-        media_playlist_file.write('#EXT-X-INDEPENDENT-SEGMENTS\r\n')
         media_playlist_file.write('#EXT-X-TARGETDURATION:%d\r\n' % (max_duration))
-#        media_playlist_file.write('#EXT-X-MEDIA-SEQUENCE:0\r\n')
-#        init_segment_size = track.parent.init_segment.position + track.parent.init_segment.size
-#        media_playlist_file.write('#EXT-X-MAP:URI="%s",BYTERANGE="%d@0"\r\n' % (media_file_name, init_segment_size))
+        media_playlist_file.write('#EXT-X-VERSION:6\r\n')
+        media_playlist_file.write('#EXT-X-MEDIA-SEQUENCE:0\r\n')
+        media_playlist_file.write('#EXT-X-PLAYLIST-TYPE:VOD\r\n')
+        media_playlist_file.write(('#EXT-X-MAP:URI="%s"\r\n' % path.join(audio_source.base_url, audio_source.init_segment.url)).encode('utf-8'))
+
         bitrate = int(audio_source.bandwidth) / len(audio_source.data_segments)
+
         for data in audio_source.data_segments:
             media_playlist_file.write('#EXTINF:%f,\r\n' % (data.duration))
-            media_playlist_file.write('#EXT-X-BITRATE:%d\r\n' % (bitrate))
             media_playlist_file.write((path.join(audio_source.base_url, data.url)).encode('utf-8'))
             media_playlist_file.write('\r\n')
+        media_playlist_file.write('#EXT-X-ENDLIST')
 
     master_playlist_file.write('\r\n')
     master_playlist_file.write('# Video\r\n')
@@ -572,19 +570,19 @@ def main():
         max_duration = int(math.ceil(max([value.duration for index, value in enumerate(video_source.data_segments)])))
 
         media_playlist_file.write('#EXTM3U\r\n')
-        media_playlist_file.write('# Created with Bento4 mp4-dash.py, VERSION=' + mp4tohls.VERSION + '-' + mp4tohls.SDK_REVISION+'\r\n')
-        media_playlist_file.write('#\r\n')
-        media_playlist_file.write('#EXT-X-VERSION:6\r\n')
-        media_playlist_file.write('#EXT-X-PLAYLIST-TYPE:VOD\r\n')
-        media_playlist_file.write('#EXT-X-INDEPENDENT-SEGMENTS\r\n')
         media_playlist_file.write('#EXT-X-TARGETDURATION:%d\r\n' % (max_duration))
+        media_playlist_file.write('#EXT-X-VERSION:6\r\n')
+        media_playlist_file.write('#EXT-X-MEDIA-SEQUENCE:1\r\n')
+        media_playlist_file.write('#EXT-X-PLAYLIST-TYPE:VOD\r\n')
+        media_playlist_file.write(('#EXT-X-MAP:URI="%s"\r\n' % path.join(video_source.base_url, video_source.init_segment.url)).encode('utf-8'))
 
         bitrate = int(video_source.bandwidth) / len(video_source.data_segments)
+        
         for data in video_source.data_segments:
             media_playlist_file.write('#EXTINF:%f,\r\n' % (data.duration))
-            media_playlist_file.write('#EXT-X-BITRATE:%d\r\n' % (bitrate))
             media_playlist_file.write((path.join(video_source.base_url, data.url)).encode('utf-8'))
             media_playlist_file.write('\r\n')
+        media_playlist_file.write('#EXT-X-ENDLIST')
 
     
 ###########################    
