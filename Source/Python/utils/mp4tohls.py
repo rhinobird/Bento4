@@ -342,7 +342,7 @@ def AddDescriptor(adaptation_set, set_attributes, set_name, category_name):
 
 #############################################
 def GenerateHls(list, options):
-    media_sources = [MediaSource(mpd_source.url) for mpd_source in list]
+    media_sources = [MediaSource(mpd_source) for mpd_source in list]
     
     tmp_media_sources = []
     for media_source in media_sources:
