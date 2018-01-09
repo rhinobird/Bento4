@@ -466,6 +466,8 @@ def main():
                       help="Directory where the Bento4 executables are located")
     parser.add_option('', '--hls-master-playlist-name', dest="hls_master_playlist_name",
                       help="HLS master playlist name (default: master.m3u8)", metavar="<filename>", default='master.m3u8')
+    parser.add_option('', '--use-urls', dest="use_urls",
+                      help="Use an array of urls instead of a manifest", default=False)
     parser.add_option('', '--rename-media', dest='rename_media', action='store_true', default=False,
                       help = 'Use a file name pattern instead of the base name of input files for output media files.')
     parser.add_option('', '--media-prefix', dest='media_prefix', metavar='<prefix>', default='media',
@@ -484,7 +486,12 @@ def main():
 
     # create the output dir
     MakeNewDir(options.output_dir, options.force_output)
-    
+
+    if Options.use_urls:
+        mpd_sources = args[0].split(',')
+        mp4tohls.GenerateHls(mpd_sources, options)
+        sys.exit(0)
+
     # load and parse the MPD
     if Options.verbose: print "Loading MPD from", mpd_url
     try:
