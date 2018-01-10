@@ -454,20 +454,20 @@ def main():
 
     # parse options
     parser = OptionParser(usage="%prog [options] <file-or-http-url>\n")
-    parser.add_option('-v', '--verbose', dest="verbose", action='store_true', default=False,
-                      help="Be verbose")
-    parser.add_option('-d', '--debug', dest="debug", default=False,
-                      help="Print out debugging information")
-    parser.add_option('-o', '--output-dir', dest="output_dir",
-                      help="Output directory", metavar="<output-dir>", default='output')
-    parser.add_option('-f', '--force', dest="force_output", action="store_true",
-                      help="Allow output to an existing directory", default=False)
-    parser.add_option('', "--exec-dir", metavar="<exec_dir>", dest="exec_dir", default=default_exec_dir,
-                      help="Directory where the Bento4 executables are located")
-    parser.add_option('', '--hls-master-playlist-name', dest="hls_master_playlist_name",
-                      help="HLS master playlist name (default: master.m3u8)", metavar="<filename>", default='master.m3u8')
-    parser.add_option('', '--use-urls', dest="use_urls",
-                      help="Use an array of urls instead of a manifest", default=False)
+    parser.add_option('-v', '--verbose', dest='verbose', action='store_true', default=False,
+                      help='Be verbose')
+    parser.add_option('-d', '--debug', dest='debug', default=False,
+                      help='Print out debugging information')
+    parser.add_option('-o', '--output-dir', dest='output_dir',
+                      help='Output directory', metavar='<output-dir>', default='output')
+    parser.add_option('-f', '--force', dest='force_output', action='store_true',
+                      help='Allow output to an existing directory', default=False)
+    parser.add_option('', '--exec-dir', metavar='<exec_dir>', dest='exec_dir', default=default_exec_dir,
+                      help='Directory where the Bento4 executables are located')
+    parser.add_option('', '--hls-master-playlist-name', dest='hls_master_playlist_name',
+                      help='HLS master playlist name (default: master.m3u8)', metavar='<filename>', default='master.m3u8')
+    parser.add_option('', '--use-urls', dest='use_urls', action='store_true', default=False,
+                      help='Use an array of urls instead of a manifest')
     parser.add_option('', '--rename-media', dest='rename_media', action='store_true', default=False,
                       help = 'Use a file name pattern instead of the base name of input files for output media files.')
     parser.add_option('', '--media-prefix', dest='media_prefix', metavar='<prefix>', default='media',
