@@ -744,53 +744,65 @@ def OutputHls(options, set_attributes, audio_sets, video_sets, subtitles_sets, s
     master_playlist_file.write('\r\n')
     master_playlist_file.write('# Audio\r\n')
     audio_groups = {}
+
     for adaptation_set_name, audio_tracks in audio_sets.items():
         language = audio_tracks[0].language.decode('utf-8')
         language_name = LanguageNames.get(language, language).decode('utf-8')
         
-        for audio_track in audio_tracks:
-            audio_group_name = audio_track.representation_id
-            audio_groups[audio_group_name] = {
-                'codec': '',
-                'average_segment_bitrate': 0,
-                'max_segment_bitrate': 0
-            }
-            
-            # update the avergage and max bitrates
-            if audio_track.average_segment_bitrate > audio_groups[audio_group_name]['average_segment_bitrate']:
-                audio_groups[audio_group_name]['average_segment_bitrate'] = audio_track.average_segment_bitrate
-            if audio_track.max_segment_bitrate > audio_groups[audio_group_name]['max_segment_bitrate']:
-                audio_groups[audio_group_name]['max_segment_bitrate'] = audio_track.max_segment_bitrate
+        audio_track = max(audio_tracks, key=lambda s: s.average_segment_bitrate)
 
-            # update/check the codec
-            if audio_groups[audio_group_name]['codec'] == '':
-                audio_groups[audio_group_name]['codec'] = audio_track.codec
-            else:
-                if audio_groups[audio_group_name]['codec'] != audio_track.codec:
-                    print 'WARNING: audio codecs not all the same:', audio_groups[audio_group_name]['codec'], audio_track.codec
+        audio_group_name = audio_track.representation_id
+        audio_groups[audio_group_name] = {
+            'codec': '',
+            'average_segment_bitrate': 0,
+            'max_segment_bitrate': 0
+        }
+        
+        # update the avergage and max bitrates
+        if audio_track.average_segment_bitrate > audio_groups[audio_group_name]['average_segment_bitrate']:
+            audio_groups[audio_group_name]['average_segment_bitrate'] = audio_track.average_segment_bitrate
+        if audio_track.max_segment_bitrate > audio_groups[audio_group_name]['max_segment_bitrate']:
+            audio_groups[audio_group_name]['max_segment_bitrate'] = audio_track.max_segment_bitrate
 
-            media_subdir        = ''
-            media_file_name     = audio_track.parent.media_name
-            media_playlist_name = audio_track.representation_id+".m3u8"
-            media_playlist_path = media_playlist_name
+        # update/check the codec
+        if audio_groups[audio_group_name]['codec'] == '':
+            audio_groups[audio_group_name]['codec'] = audio_track.codec
+        else:
+            if audio_groups[audio_group_name]['codec'] != audio_track.codec:
+                print 'WARNING: audio codecs not all the same:', audio_groups[audio_group_name]['codec'], audio_track.codec
 
-            master_playlist_file.write(('#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="%s"\r\n' % (
-                                        audio_group_name,
-                                        language,
-                                        language_name,
-                                        media_playlist_path)).encode('utf-8'))
+        media_subdir        = ''
+        media_file_name     = audio_track.parent.media_name
+        media_playlist_name = audio_track.representation_id+".m3u8"
+        media_playlist_path = media_playlist_name
 
-            OutputHlsTrack(options, audio_track, media_subdir, media_playlist_name, audio_track.parent.remote_url)
-            os.remove(path.join(options.output_dir, audio_track.parent.media_name))
+        master_playlist_file.write(('#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",AVERAGE-BANDWIDTH=%d,BANDWIDTH=%d,LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="%s"\r\n' % (
+                                    audio_group_name,
+                                    audio_groups[audio_group_name]['average_segment_bitrate'],
+                                    audio_groups[audio_group_name]['max_segment_bitrate'],
+                                    language,
+                                    language_name,
+                                    media_playlist_path)).encode('utf-8'))
+
+        audio_codec = audio_groups[audio_group_name]['codec']
+        audio_source_playlist = ('#EXT-X-STREAM-INF:AUDIO="%s",AVERAGE-BANDWIDTH=%d,BANDWIDTH=%d,CODECS="%s"\r\n%s\r\n' % (
+                                audio_group_name,
+                                audio_groups[audio_group_name]['average_segment_bitrate'],
+                                audio_groups[audio_group_name]['max_segment_bitrate'],
+                                audio_codec,
+                                media_playlist_path)).encode('utf-8')
+
+
+        OutputHlsTrack(options, audio_track, media_subdir, media_playlist_name, audio_track.parent.remote_url)
+        os.remove(path.join(options.output_dir, audio_track.parent.media_name))
 
     master_playlist_file.write('\r\n')
     master_playlist_file.write('# Video\r\n')
-    for video_track in sorted(all_video_tracks, key=lambda video_track: video_track.average_segment_bitrate):
+    for video_track in [t for t in sorted(all_video_tracks, key=lambda t: t.average_segment_bitrate) if t.height >= 360]:
         media_subdir          = ''
         media_file_name       = video_track.parent.media_name
         media_playlist_name   = video_track.representation_id+".m3u8"
         media_playlist_path   = media_playlist_name
-        iframes_playlist_name = video_track.representation_id+"_iframes.m3u8"
 
         if len(audio_groups):
             # one entry per audio group
@@ -816,17 +828,8 @@ def OutputHls(options, set_attributes, audio_sets, video_sets, subtitles_sets, s
 
         OutputHlsTrack(options, video_track, media_subdir, media_playlist_name, video_track.parent.remote_url)
         os.remove(path.join(options.output_dir, video_track.parent.media_name))
-#        OutputHlsIframeIndex(options, video_track, media_subdir, iframes_playlist_name, video_track.parent.remote_url)
 
-#    master_playlist_file.write('\r\n# I-Frame Playlists\r\n')
-#    for video_track in all_video_tracks:
-#        master_playlist_file.write('#EXT-X-I-FRAME-STREAM-INF:AVERAGE-BANDWIDTH=%d,BANDWIDTH=%d,CODECS="%s",RESOLUTION=%dx%d,URI="%s"\r\n' % (
-#                                   video_track.average_segment_bitrate,
-#                                   video_track.max_segment_bitrate,
-#                                   video_track.codec,
-#                                   video_track.width,
-#                                   video_track.height,
-#                                   media_playlist_path))
+    master_playlist_file.write(audio_source_playlist)
 
     if len(subtitles_files):
         master_playlist_file.write('# Subtitles\r\n')
