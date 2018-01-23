@@ -533,46 +533,44 @@ def main():
         master_playlist_file.write('\r\n')
         master_playlist_file.write('# Audio\r\n')
 
-        for i, audio_source in enumerate(audio_sources):
-            filename = audio_source.id + '.m3u8'
-            media_playlist_file = open(path.join(options.output_dir, filename), 'w+')
-            master_playlist_file.write(('#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud%d",LANGUAGE="en",NAME="English",BANDWIDTH=%d,AUTOSELECT=YES,DEFAULT=YES,URI="%s"\r\n' % (
-                                       i,
-                                       int(audio_source.bandwidth),
-                                       filename)).encode('utf-8'))
+        audio_source = max(audio_sources, key=lambda s: int(s.bandwidth))
 
-            max_duration = int(math.ceil(max([value.duration for index, value in enumerate(audio_source.data_segments)])))
+        filename = audio_source.id + '.m3u8'
+        media_playlist_file = open(path.join(options.output_dir, filename), 'w+')
+        master_playlist_file.write(('#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud0",LANGUAGE="en",NAME="English",BANDWIDTH=%d,AUTOSELECT=YES,DEFAULT=YES,URI="%s"\r\n' % (
+                                   int(audio_source.bandwidth),
+                                   filename)).encode('utf-8'))
 
-            media_playlist_file.write('#EXTM3U\r\n')
-            media_playlist_file.write('#EXT-X-TARGETDURATION:%d\r\n' % (max_duration))
-            media_playlist_file.write('#EXT-X-VERSION:6\r\n')
-            media_playlist_file.write('#EXT-X-MEDIA-SEQUENCE:0\r\n')
-            media_playlist_file.write('#EXT-X-PLAYLIST-TYPE:VOD\r\n')
-            media_playlist_file.write(('#EXT-X-MAP:URI="%s"\r\n' % path.join(audio_source.base_url, audio_source.init_segment.url)).encode('utf-8'))
+        max_duration = max([segment.duration for segment in audio_source.data_segments])
 
-            bitrate = int(audio_source.bandwidth) / len(audio_source.data_segments)
+        media_playlist_file.write('#EXTM3U\r\n')
+        media_playlist_file.write('#EXT-X-TARGETDURATION:%d\r\n' % (max_duration))
+        media_playlist_file.write('#EXT-X-VERSION:6\r\n')
+        media_playlist_file.write('#EXT-X-MEDIA-SEQUENCE:0\r\n')
+        media_playlist_file.write('#EXT-X-PLAYLIST-TYPE:VOD\r\n')
+        media_playlist_file.write(('#EXT-X-MAP:URI="%s"\r\n' % path.join(audio_source.base_url, audio_source.init_segment.url)).encode('utf-8'))
 
-            for data in audio_source.data_segments:
-                media_playlist_file.write('#EXTINF:%f,\r\n' % (data.duration))
-                media_playlist_file.write((path.join(audio_source.base_url, data.url)).encode('utf-8'))
-                media_playlist_file.write('\r\n')
-            media_playlist_file.write('#EXT-X-ENDLIST')
+        bitrate = int(audio_source.bandwidth) / len(audio_source.data_segments)
+
+        for data in audio_source.data_segments:
+            media_playlist_file.write('#EXTINF:%f,\r\n' % (data.duration))
+            media_playlist_file.write((path.join(audio_source.base_url, data.url)).encode('utf-8'))
+            media_playlist_file.write('\r\n')
+        media_playlist_file.write('#EXT-X-ENDLIST')
 
         master_playlist_file.write('\r\n')
         master_playlist_file.write('# Video\r\n')
 
-        for j, video_source in enumerate(video_sources):
+        for j, video_source in enumerate([source for source in video_sources if int(source.height) >= 360]):
             filename = video_source.id + '.m3u8'
             media_playlist_file = open(path.join(options.output_dir, filename), 'w+')
-            for i, audio_source in enumerate(audio_sources):
-                master_playlist_file.write(('#EXT-X-STREAM-INF:AUDIO="aud%d",AVERAGE-BANDWIDTH=%d,BANDWIDTH=%d,CODECS="%s",RESOLUTION=%sx%s\r\n' % (
-                                            i,
-                                            int(video_source.bandwidth) + int(audio_source.bandwidth),
-                                            int(video_source.bandwidth) + int(audio_source.bandwidth),
-                                            video_source.codecs + ',' + audio_source.codecs,
-                                            video_source.width,
-                                            video_source.height)).encode('utf-8'))
-                master_playlist_file.write(filename+'\r\n')
+            
+            master_playlist_file.write(('#EXT-X-STREAM-INF:AUDIO="aud0",BANDWIDTH=%d,CODECS="%s",RESOLUTION=%sx%s\r\n' % (
+                                        int(video_source.bandwidth) + int(audio_source.bandwidth),
+                                        video_source.codecs + ',' + audio_source.codecs,
+                                        video_source.width,
+                                        video_source.height)).encode('utf-8'))
+            master_playlist_file.write(filename+'\r\n')
             
             max_duration = int(math.ceil(max([value.duration for index, value in enumerate(video_source.data_segments)])))
 
@@ -590,6 +588,12 @@ def main():
                 media_playlist_file.write((path.join(video_source.base_url, data.url)).encode('utf-8'))
                 media_playlist_file.write('\r\n')
             media_playlist_file.write('#EXT-X-ENDLIST')
+        
+        master_playlist_file.write(('#EXT-X-STREAM-INF:AUDIO="aud0",BANDWIDTH=%d,CODECS="%s"\r\n' % (
+                                                                                                     int(audio_source.bandwidth),
+                                                                                                     audio_source.codecs)).encode('utf-8'))
+        master_playlist_file.write(audio_source.id+'.m3u8\r\n')
+            
     except Exception as e:
         print "ERROR: Trying second method", e
         mpd_sources = GetMpdSources(mpd_xml)
