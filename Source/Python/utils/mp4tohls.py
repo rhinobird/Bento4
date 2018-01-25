@@ -792,7 +792,6 @@ def OutputHls(options, set_attributes, audio_sets, video_sets, subtitles_sets, s
                                 audio_codec,
                                 media_playlist_path)).encode('utf-8')
 
-
         OutputHlsTrack(options, audio_track, media_subdir, media_playlist_name, audio_track.parent.remote_url)
         os.remove(path.join(options.output_dir, audio_track.parent.media_name))
 
@@ -829,7 +828,7 @@ def OutputHls(options, set_attributes, audio_sets, video_sets, subtitles_sets, s
         OutputHlsTrack(options, video_track, media_subdir, media_playlist_name, video_track.parent.remote_url)
         os.remove(path.join(options.output_dir, video_track.parent.media_name))
 
-    master_playlist_file.write(audio_source_playlist)
+    #master_playlist_file.write(audio_source_playlist)
 
     if len(subtitles_files):
         master_playlist_file.write('# Subtitles\r\n')

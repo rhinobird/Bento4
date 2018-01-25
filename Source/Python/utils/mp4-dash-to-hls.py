@@ -589,11 +589,11 @@ def main():
                 media_playlist_file.write('\r\n')
             media_playlist_file.write('#EXT-X-ENDLIST')
         
-        master_playlist_file.write(('#EXT-X-STREAM-INF:AUDIO="aud0",BANDWIDTH=%d,CODECS="%s"\r\n' % (
-                                                                                                     int(audio_source.bandwidth),
-                                                                                                     audio_source.codecs)).encode('utf-8'))
-        master_playlist_file.write(audio_source.id+'.m3u8\r\n')
-            
+#        master_playlist_file.write(('#EXT-X-STREAM-INF:AUDIO="aud0",BANDWIDTH=%d,CODECS="%s"\r\n' % (
+#                                                                                                     int(audio_source.bandwidth),
+#                                                                                                     audio_source.codecs)).encode('utf-8'))
+#        master_playlist_file.write(audio_source.id+'.m3u8\r\n')
+
     except Exception as e:
         print "ERROR: Trying second method", e
         mpd_sources = GetMpdSources(mpd_xml)
